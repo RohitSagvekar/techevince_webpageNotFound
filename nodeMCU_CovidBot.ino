@@ -325,7 +325,9 @@ void shortpath()
 
 
 void setup() {
+  
   Serial.begin(115200);
+  
   
   // Connect to Wi-Fi network with SSID and password
   Serial.print("Connecting to ");
@@ -341,7 +343,27 @@ void setup() {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
   server.begin();
+
+  // put your setup code here, to run once:
+  pinMode(motor1pin1, OUTPUT);
+  pinMode(motor1pin2, OUTPUT);
+  pinMode(motor2pin1, OUTPUT);
+  pinMode(motor2pin2, OUTPUT);
+  pinMode(IRSensor1, INPUT);
+  pinMode(IRSensor2, INPUT);
+  pinMode(IRSensor3, INPUT);
+  pinMode(IRSensor4, INPUT);
+  pinMode(IRSensor5, INPUT);
+
+  for (int i = 0; i < 50; i++)
+  { // Putting all 'A's in the bedmap Matrix.
+    for (int j = 0; j < 50; j++)
+    {
+      bedMap[i][j] = 'A';
+    }
+  }
 }
+
 
 void loop(){
   WiFiClient client = server.available();   // Listen for incoming clients
