@@ -20,9 +20,16 @@ String header;
 String output5State = "off";
 String output4State = "off";
 
-// Assign output variables to GPIO pins
-const int output5 = 5;
-const int output4 = 4;
+// Pins
+int motor1pin1 = 5; // Motorpins
+int motor1pin2 = 6;
+int motor2pin1 = 7;
+int motor2pin2 = 8;
+int IRSensor1 = 0; // Haanji toh this is the 5 IRSensor array
+int IRSensor2 = 1;
+int IRSensor3 = 2;
+int IRSensor4 = 3;
+int IRSensor5 = 4;
 
 // Current time
 unsigned long currentTime = millis();
@@ -31,20 +38,295 @@ unsigned long previousTime = 0;
 // Define timeout time in milliseconds (example: 2000ms = 2s)
 const long timeoutTime = 2000;
 
+char bedMap[50][50]; // Ha toh bedSize yaha declare karenge. Will change that manually for bigger maps.
+                     // Here there's another assumption that there arent a lot of unnecessary turns in the path.
+
+int length(char arr1[])
+{
+  for (int i = 0; i < 50; i++)
+  {
+    if (arr1[i] == 'A')
+    {
+      return i;
+    }
+  }
+}
+
+char presentLocation[50];
+
+char tempAddress[50];
+
+int targetLocations[] = {1, 4, 7, 8, 9, 42}; // Input taken from NodeMCU
+
+int numberTarget; // len(targetLocations)
+int currentTurn = 0;
+int currentBed = 0;
+int Bn = 0;
+int Tn = 0;
+
+
 
 //the two MODE flags. mapMode and moveMode
 int mapFlag = 0;
 int moveFlag = 0;
+int stationFlag = 0;//flags
+int terminusFlag = 0;
+int xFlag = 0;
+int tStraightFlag = 0;
+int tLeftFlag = 0;
+int tRightFlag = 0;
+int lLeftFlag = 0;
+int lRightFlag = 0;
+int shortpathFlag = 0;
+int dataInputFlag = 0;
+
+// Time constants
+int stopTime = 50; // These are the time constants
+int turnTime = 50; // toh this is a new variable we have declared. We will fine tune this once the bot is built. it represets the milliseconds required for the bot to take a right turn.
+int nodeTime = 50; // This is for differentiation b/w station, junction and terminus
+
+// Path status variables
+int statusSensor1;
+int statusSensor2;
+int statusSensor3;
+int statusSensor4;
+int statusSensor5;
+int prevSensor1;
+int prevSensor2;
+int prevSensor3;
+int prevSensor4;
+int prevSensor5;
+
+
+
+
+
+
+
+
+//The self declared functions 
+void readSensor()
+{
+  statusSensor1 = digitalRead(IRSensor1); // This is for chechking what is under the sensor array in this moment
+  statusSensor2 = digitalRead(IRSensor2);
+  statusSensor3 = digitalRead(IRSensor3);
+  statusSensor4 = digitalRead(IRSensor4);
+  statusSensor5 = digitalRead(IRSensor5);
+}
+
+// Ha abhi we'll define functions for left right straight.
+void turnLeft()
+{
+  digitalWrite(motor1pin1, HIGH);
+  digitalWrite(motor1pin2, LOW);
+  delay(turnTime);
+  digitalWrite(motor1pin1, LOW);
+  digitalWrite(motor1pin2, LOW);
+}
+
+void turnRight()
+{
+  digitalWrite(motor2pin1, HIGH);
+  digitalWrite(motor2pin2, LOW);
+  delay(turnTime);
+  digitalWrite(motor2pin1, LOW);
+  digitalWrite(motor2pin2, LOW);
+}
+
+void turnStraight()
+{
+  digitalWrite(motor1pin1, HIGH);
+  digitalWrite(motor1pin2, LOW);
+  digitalWrite(motor2pin1, HIGH);
+  digitalWrite(motor2pin2, LOW);
+  delay(turnTime);
+  digitalWrite(motor1pin1, LOW);
+  digitalWrite(motor1pin2, LOW);
+  digitalWrite(motor2pin1, LOW);
+  digitalWrite(motor2pin2, LOW);
+}
+void turnBack()
+{
+  digitalWrite(motor2pin1, HIGH);
+  digitalWrite(motor2pin2, LOW);
+  delay(2 * turnTime);
+  digitalWrite(motor2pin1, LOW);
+  digitalWrite(motor2pin2, LOW);
+}
+
+void goAhead()
+{
+  if (statusSensor2 == 1)
+  {
+    digitalWrite(motor1pin1, LOW);
+    digitalWrite(motor1pin2, LOW);
+    digitalWrite(motor2pin1, HIGH);
+    digitalWrite(motor2pin2, LOW);
+  }
+  else if (statusSensor4 == 1)
+  {
+    digitalWrite(motor1pin1, HIGH);
+    digitalWrite(motor1pin2, LOW);
+    digitalWrite(motor2pin1, LOW);
+    digitalWrite(motor2pin2, LOW);
+  }
+  else
+  {
+    digitalWrite(motor1pin1, HIGH);
+    digitalWrite(motor1pin2, LOW);
+    digitalWrite(motor2pin1, HIGH);
+    digitalWrite(motor2pin2, LOW);
+  }
+  delay(stopTime);
+  digitalWrite(motor1pin1, LOW);
+  digitalWrite(motor1pin2, LOW);
+  digitalWrite(motor2pin1, LOW);
+  digitalWrite(motor2pin2, LOW);
+}
+
+void goBack()
+{
+  digitalWrite(motor1pin1, LOW);
+  digitalWrite(motor1pin2, HIGH);
+  digitalWrite(motor2pin1, LOW);
+  digitalWrite(motor2pin2, HIGH);
+  delay(stopTime);
+  digitalWrite(motor1pin1, LOW);
+  digitalWrite(motor1pin2, LOW);
+  digitalWrite(motor2pin1, LOW);
+  digitalWrite(motor2pin2, LOW);
+  turnStraight;
+}
+
+void straightCheck(int checkDummy)
+{
+  digitalWrite(motor1pin1, HIGH);
+  digitalWrite(motor1pin2, LOW);
+  digitalWrite(motor2pin1, HIGH);
+  digitalWrite(motor2pin2, LOW);
+  delay(checkDummy);
+  readSensor();
+  digitalWrite(motor1pin1, LOW);
+  digitalWrite(motor1pin2, LOW);
+  digitalWrite(motor2pin1, LOW);
+  digitalWrite(motor2pin2, LOW);
+}
+
+void backCheck(int checkDummy)
+{
+  digitalWrite(motor1pin1, LOW);
+  digitalWrite(motor1pin2, HIGH);
+  digitalWrite(motor2pin1, LOW);
+  digitalWrite(motor2pin2, HIGH);
+  delay(checkDummy);
+  readSensor();
+  digitalWrite(motor1pin1, LOW);
+  digitalWrite(motor1pin2, LOW);
+  digitalWrite(motor2pin1, LOW);
+  digitalWrite(motor2pin2, LOW);
+}
+
+void detectNode()
+{ // This set of functions detect nodes at which the decision making will occur
+  if (statusSensor1 == 1 or statusSensor5 == 1)
+  {
+    prevSensor1 = statusSensor1; // storing IR states as soon as it detects a junction
+    prevSensor2 = statusSensor2;
+    prevSensor3 = statusSensor3;
+    prevSensor4 = statusSensor4;
+    prevSensor5 = statusSensor5;
+    straightCheck(3 * nodeTime);
+    if (statusSensor1 == 1 && statusSensor2 == 1 && statusSensor3 == 1 && statusSensor4 == 1 && statusSensor5 == 1)
+    {
+      terminusFlag = 1;
+    }
+    backCheck(3 * nodeTime);
+    straightCheck(nodeTime);
+    if (statusSensor1 == 1 && statusSensor2 == 1 && statusSensor3 == 1 && statusSensor4 == 1 && statusSensor5 == 1)
+    {
+      stationFlag = 1;
+    }
+    else if (statusSensor3 == 0 and prevSensor1 == 0 and prevSensor5 == 1)
+    {
+      lRightFlag = 1;
+    }
+    else if (statusSensor3 == 0 and prevSensor1 == 1 and prevSensor5 == 0)
+    {
+      lLeftFlag = 1;
+    }
+    else if (statusSensor3 == 0 and prevSensor1 == 1 and prevSensor5 == 1)
+    {
+      tStraightFlag = 1;
+    }
+    else if (statusSensor3 == 1 and prevSensor1 == 1 and prevSensor5 == 1)
+    {
+      xFlag = 1;
+    }
+    else if (statusSensor3 == 1 and prevSensor1 == 1 and prevSensor5 != 1)
+    { // can be removed
+      tLeftFlag = 1;
+    }
+    else if (statusSensor3 == 1 and prevSensor1 != 1 and prevSensor5 == 1)
+    { // can be removed
+      tRightFlag = 1;
+    }
+    backCheck(nodeTime);
+  }
+}
+
+void shortpath()
+{
+  if (bedMap[Bn][Tn] == 'L' && bedMap[Bn][Tn - 2] == 'L')
+  {
+    bedMap[Bn][Tn - 2] = 'S';
+    bedMap[Bn][Tn - 1] = '_';
+    bedMap[Bn][Tn] = '_';
+    Tn = Tn - 2;
+  }
+  else if (bedMap[Bn][Tn] == 'L' && bedMap[Bn][Tn - 2] == 'R')
+  {
+    bedMap[Bn][Tn - 2] = 'B';
+    bedMap[Bn][Tn - 1] = '_';
+    bedMap[Bn][Tn] = '_';
+    Tn = Tn - 2;
+  }
+  else if (bedMap[Bn][Tn] == 'L' && bedMap[Bn][Tn - 2] == 'S')
+  {
+    bedMap[Bn][Tn - 2] = 'R';
+    bedMap[Bn][Tn - 1] = '_';
+    bedMap[Bn][Tn] = '_';
+    Tn = Tn - 2;
+  }
+  else if (bedMap[Bn][Tn] == 'S' && bedMap[Bn][Tn - 2] == 'L')
+  {
+    bedMap[Bn][Tn - 2] = 'R';
+    bedMap[Bn][Tn - 1] = '_';
+    bedMap[Bn][Tn] = '_';
+    Tn = Tn - 2;
+  }
+  else if (bedMap[Bn][Tn] == 'S' && bedMap[Bn][Tn - 2] == 'S')
+  {
+    bedMap[Bn][Tn - 2] = 'B';
+    bedMap[Bn][Tn - 1] = '_';
+    bedMap[Bn][Tn] = '_';
+    Tn = Tn - 2;
+  }
+  else if (bedMap[Bn][Tn] == 'R' && bedMap[Bn][Tn - 2] == 'L')
+  {
+    bedMap[Bn][Tn - 2] = 'B';
+    bedMap[Bn][Tn - 1] = '_';
+    bedMap[Bn][Tn] = '_';
+    Tn = Tn - 2;
+  }
+  shortpathFlag = 0;
+}
+
+
+
 
 void setup() {
   Serial.begin(115200);
-  // Initialize the output variables as outputs
-  pinMode(output5, OUTPUT);
-  pinMode(output4, OUTPUT);
-  // Set outputs to LOW
-  digitalWrite(output5, LOW);
-  digitalWrite(output4, LOW);
-
+  
   // Connect to Wi-Fi network with SSID and password
   Serial.print("Connecting to ");
   Serial.println(ssid);
