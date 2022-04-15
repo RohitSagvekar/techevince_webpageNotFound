@@ -198,6 +198,13 @@ void goBack()
   turnStraight;
 }
 
+void  Stop(){
+  digitalWrite(motor1pin1, LOW);
+  digitalWrite(motor1pin2, LOW);
+  digitalWrite(motor2pin1, LOW);
+  digitalWrite(motor2pin2, LOW);
+}
+
 void straightCheck(int checkDummy)
 {
   digitalWrite(motor1pin1, HIGH);
@@ -408,6 +415,155 @@ void loop(){
               output4State = "off";
               moveFlag = 0;
             }
+
+
+
+            if (mapFlag == 1)
+  {            // THIS IS THE MAPPING LOOP.
+               // By the end of this, bedMap should be generated
+               // So the exit condition of this loop would be when detectTerminus flag is raised.
+    goAhead(); // Start of LSRB
+    detectNode();
+    if (xFlag == 1 or tStraightFlag == 1 or tLeftFlag == 1)
+    {
+      turnLeft();
+      bedMap[Bn][Tn] = 'L';
+      Tn++;
+      if (shortpathFlag = 1)
+      {
+        shortpath();
+        shortpathFlag = 0;
+      }
+    }
+    else if (tRightFlag == 1)
+    {
+      turnStraight();
+      bedMap[Bn][Tn] = 'S';
+      Tn++;
+      if (shortpathFlag = 1)
+      {
+        shortpath();
+        shortpathFlag = 0;
+      }
+    }
+    else if (terminusFlag == 1)
+    {
+      for (int i = 0; i < 100; i++)
+      {
+        bedMap[Bn][i] = 0;
+      }
+
+      Tn = 0;
+      mapFlag = 0;
+      turnBack();
+      // LCD pe put "Mapping is complete"
+    }
+    else if (stationFlag == 1)
+    {
+      turnBack();
+      Bn++;
+      for (int i = 0; i < 100; i++)
+      {
+        bedMap[Bn][i] = bedMap[Bn - 1][i];
+      }
+      Tn++;
+      bedMap[Bn][Tn] = 'B';
+      shortpathFlag = 1;
+      // On LCD print "Bed N"
+    }
+    // end of LSRB
+    // an if statement to check stationFlag and terminusFlag
+  }
+
+  if (moveFlag == 1)
+  { // THIS IS THE MOVING LOOP
+    // This will have spaces where we will insert lakshyaTarang code
+    // Append terminus as last target location.
+    goAhead();
+    detectNode();
+
+    if (currentBed == 0)
+    {
+      int i = 0;
+      while (bedMap[currentBed][i] != 'A')
+      {
+        tempAddress[i] = bedMap[targetLocations[0]][i];
+        i++;
+      }
+    }
+
+    else if (currentBed != 0)
+    { // find out last common node, then negate the entries after that.
+      int i = 0;
+      int k = 0;
+      while (bedMap[targetLocations[currentBed - 1]][i] == tempAddress[i])
+      {
+        i++;
+      }
+      // at this point i is the last +1 common node.
+      for (int j = length(bedMap[currentBed - 1]) - 1; j > i - 1; j--)
+      {
+        if (bedMap[currentBed - 1][Tn] == 'L')
+        {
+          tempAddress[k] = 'R';
+        }
+        if (bedMap[currentBed - 1][Tn] == 'S')
+        {
+          tempAddress[k] = 'B';
+        }
+        if (bedMap[currentBed - 1][Tn] == 'R')
+        {
+          tempAddress[k] = 'L';
+        }
+        if (bedMap[currentBed - 1][Tn] == 'B')
+        {
+          tempAddress[k] = 'S';
+        }
+        k++;
+      }
+      for (int j = i; i < length(bedMap[currentBed]); i++)
+      {
+        tempAddress[k] = bedMap[currentBed][j];
+        k++;
+      }
+    }
+
+    if (xFlag == 1 or tLeftFlag == 1 or tRightFlag == 1 or tStraightFlag == 1)
+    { // This part makes bot take turn decisions based on tempAddress matrix
+      if (tempAddress[currentTurn] == 'L')
+      { // repeat for 4 instances
+        turnLeft();
+      }
+      if (tempAddress[currentTurn] == 'S')
+      {
+        turnStraight();
+      }
+      if (tempAddress[currentTurn] == 'R')
+      {
+        turnRight();
+      }
+      if (tempAddress[currentTurn] == 'B')
+      {
+        turnBack();
+      }
+      Tn++;
+    }
+    if (stationFlag == 1)
+    { delay(5000);
+      currentBed++;
+      currentTurn = 0;
+    }
+  }
+
+  delay(stopTime);
+  stationFlag = 0;
+  terminusFlag = 0;
+  xFlag = 0;
+  tStraightFlag = 0;
+  tLeftFlag = 0;
+  tRightFlag = 0;
+  lLeftFlag = 0;
+  lRightFlag = 0;
             
             // Display the HTML web page
             client.println("<!DOCTYPE html><html>");
